@@ -279,7 +279,6 @@
 
     <button id="sndBtn">🔊</button>
 
-    <!-- УМНАЯ ЗАГРУЗКА THREE.JS: Сначала локальный файл (офлайн), потом CDN (онлайн) -->
     <script>
         (function() {
             var s = document.createElement('script');
@@ -300,7 +299,6 @@
         })();
     </script>
 
-    <!-- ОСНОВНОЙ КОД ИГРЫ -->
     <script>
         window.addEventListener('three-ready', function() {
             (function() {
@@ -573,30 +571,63 @@
                 }
 
                 let ruVoice = null;
+                let isSpeaking = false;
+
                 if ('speechSynthesis' in window) {
-                    const pick = () => { ruVoice = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().indexOf('ru') === 0) || null; };
-                    pick(); speechSynthesis.onvoiceschanged = pick;
+                    const pick = () => {
+                        const voices = speechSynthesis.getVoices();
+                        ruVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('ru') && v.localService) || 
+                                  voices.find(v => v.lang && v.lang.toLowerCase().startsWith('ru')) || null;
+                    };
+                    pick();
+                    speechSynthesis.onvoiceschanged = pick;
                 }
-                function unlockUI() { document.body.classList.remove('locked'); uiLocked = false; }
+
+                function unlockUI() {
+                    document.body.classList.remove('locked');
+                    uiLocked = false;
+                    isSpeaking = false;
+                }
+
                 function speak(text, r = 1, p = 1) {
                     if (muted || !('speechSynthesis' in window)) return;
-                    try {
-                        speechSynthesis.cancel();
+                    speechSynthesis.cancel();
+                    setTimeout(() => {
+                        if (muted) return;
                         const u = new SpeechSynthesisUtterance(text);
-                        u.lang = 'ru-RU'; if (ruVoice) u.voice = ruVoice;
-                        u.rate = r; u.pitch = p; u.volume = 1;
-                        const my = ++lockToken;
-                        document.body.classList.add('locked'); uiLocked = true;
-                        const done = () => { if (my === lockToken) unlockUI(); };
-                        u.onend = done; u.onerror = done;
-                        setTimeout(done, Math.min(6000, 900 + text.length * 95 / (r || 1)));
+                        u.rate = r;
+                        u.pitch = p;
+                        u.volume = 1;
+                        if (ruVoice) {
+                            u.voice = ruVoice;
+                            u.lang = 'ru-RU';
+                        } else {
+                            u.lang = 'ru-RU';
+                        }
+                        isSpeaking = true;
+                        document.body.classList.add('locked');
+                        uiLocked = true;
+                        let safetyTimer = setTimeout(() => {
+                            console.warn('Speech timeout: разблокировка по таймауту');
+                            unlockUI();
+                        }, 12000);
+                        const clearAndUnlock = () => {
+                            clearTimeout(safetyTimer);
+                            unlockUI();
+                        };
+                        u.onend = clearAndUnlock;
+                        u.onerror = clearAndUnlock;
                         speechSynthesis.speak(u);
-                    } catch (e) { lockToken++; unlockUI(); }
+                    }, 50);
                 }
+
                 function stopSpeak() {
-                    if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
-                    lockToken++; unlockUI();
+                    if ('speechSynthesis' in window) {
+                        try { speechSynthesis.cancel(); } catch (e) {}
+                    }
+                    unlockUI();
                 }
+
                 document.getElementById('sndBtn').addEventListener('pointerdown', e => {
                     e.stopPropagation(); muted = !muted; e.target.textContent = muted ? '🔇' : '🔊';
                     if (muted) stopSpeak(); else ac();
@@ -647,7 +678,7 @@
                 function nextCast() { G.cast++; if (G.cast > CASTS) { finishGame(); return; } G.phase = 'idle'; floatG.visible = false; }
                 function doCast() { G.phase = 'cast'; G.castT = 0; G.waitDur = 1.5 + Math.random() * 3; G.fakeAt = 0.4 + Math.random() * 0.5; G.fakeDone = false; G.fakeT = 0; beep(500, 0.06); }
                 function resolveCatch() {
-                    if (navigator.vibrate) navigator.vibrate([50, 30, 50]); // Вибрация при успехе
+                    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
                     const f = pickFish(); G.score += f.pts; G.catches.push(f.name);
                     scoreEl.textContent = G.score; catchEl.textContent = f.name;
                     msgShow(f.name + '! +' + f.pts); speak(f.name + '! Плюс ' + f.pts + ' ' + ptsWord(f.pts), 1.05, 1.2);
@@ -657,7 +688,7 @@
                     G.phase = 'done'; G.t = 0;
                 }
                 function fail(msg, sp) {
-                    if (navigator.vibrate) navigator.vibrate(100); // Вибрация при ошибке
+                    if (navigator.vibrate) navigator.vibrate(100);
                     msgShow(msg); speak(sp, 1.1, 0.85); splash(FLOAT_POS.x, FLOAT_POS.z, 8, 0.7);
                     G.phase = 'done'; G.t = 0; G.fish = null;
                 }
