@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0e2230">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="РЫБАЛКА·5 — 3D рыбалка. Бесплатное офлайн-приложение Anti-AI Shield.">
+    <title>РЫБАЛКА·5 — 3D рыбалка</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="shortcut icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            height: 100%; overflow: hidden; background: #0e2230;
+            touch-action: none; font-family: 'Rubik', sans-serif;
+            color: #fbfbf9; -webkit-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+        canvas { display: block; position: fixed; inset: 0; }
+        #vig {
+            position: fixed; inset: 0; pointer-events: none; z-index: 4;
+            background: radial-gradient(ellipse at 50% 45%, transparent 50%, rgba(6, 14, 20, 0.5) 100%);
+        }
+        #credit {
+            position: fixed; right: 10px; bottom: 8px; z-index: 6; pointer-events: none;
+            font-size: 11px; letter-spacing: 0.08em; font-weight: 500;
+            color: rgba(251, 251, 249, 0.85); text-shadow: 0 1px 3px rgba(6, 14, 20, 0.9);
+        }
+        #logo {
+            position: fixed; left: 50%; top: 10px; transform: translateX(-50%); z-index: 6;
+            width: 58px; height: 58px; border-radius: 14px; pointer-events: none;
+            background: rgba(8, 20, 32, 0.6);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(57, 226, 207, 0.5);
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        #logo img { width: 100%; height: 100%; object-fit: contain; border-radius: 14px; }
+        @media (max-width: 640px) {
+            #logo { width: 46px; height: 46px; top: 8px; border-radius: 11px; }
+            #logo img { border-radius: 11px; }
+        }
+        #hud {
+            position: fixed; inset: 0; z-index: 5; pointer-events: none;
+            opacity: 0; transition: opacity 0.6s;
+        }
+        #hud.on { opacity: 1; }
+        .chip {
+            background: linear-gradient(180deg, rgba(14, 34, 48, 0.92), rgba(8, 20, 32, 0.86));
+            border: 1px solid rgba(120, 220, 235, 0.25); border-left: 4px solid #39e2cf;
+            padding: 8px 14px; transform: skewX(-8deg); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+        }
+        .chip > * { display: inline-block; transform: skewX(8deg); }
+        .lbl { display: block; font-size: 10px; letter-spacing: 0.2em; color: #39e2cf; font-weight: 700; }
+        #topbar {
+            position: absolute; top: 0; left: 0; right: 0; display: flex; gap: 10px;
+            justify-content: space-between; align-items: flex-start; padding: 14px;
+        }
+        .val { font-family: 'Russo One', sans-serif; font-size: clamp(18px, 4vw, 26px); }
+        #bottombar {
+            position: absolute; bottom: 0; left: 0; right: 0; display: flex; gap: 10px;
+            justify-content: center; align-items: flex-end; padding: 16px;
+        }
+        #hint {
+            font-family: 'Russo One', sans-serif; font-size: clamp(13px, 3vw, 18px);
+            color: #081420; background: #ffd23f; padding: 10px 18px;
+            transform: skewX(-8deg); box-shadow: 0 6px 0 rgba(150, 110, 10, 0.55);
+        }
+        #hint span { display: inline-block; transform: skewX(8deg); }
+        .key {
+            display: inline-block; background: #0e2230; border: 1px solid #2b6d86;
+            border-bottom: 3px solid #39e2cf; border-radius: 6px; padding: 1px 9px;
+            font-size: 0.85em; margin: 0 2px; color: #fff;
+        }
+        @media (pointer: coarse) { .only-key { display: none; } }
+        @media (pointer: fine) { .only-touch { display: none; } }
+        #cd, #msg {
+            position: fixed; inset: 0; z-index: 9; display: flex;
+            align-items: center; justify-content: center; pointer-events: none;
+        }
+        #cd span, #msg span {
+            font-family: 'Russo One', sans-serif; font-size: clamp(44px, 12vw, 120px);
+            color: #fff; opacity: 0; text-shadow: 0 4px 0 rgba(8, 20, 32, 0.6), 0 0 40px rgba(57, 226, 207, 0.7);
+        }
+        #msg span {
+            color: #ffd23f; text-shadow: 0 4px 0 rgba(8, 20, 32, 0.6), 0 0 44px rgba(255, 210, 63, 0.85);
+        }
+        #cd span.pop, #msg span.pop { animation: bigpop 1.1s ease-out forwards; }
+        @keyframes bigpop {
+            0% { opacity: 0; transform: scale(2.2); }
+            18% { opacity: 1; transform: scale(1); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: scale(0.9); }
+        }
+        .ovl {
+            position: fixed; inset: 0; z-index: 10; transition: opacity 0.5s; pointer-events: auto;
+        }
+        .ovl.hide { opacity: 0; pointer-events: none; }
+        #menu {
+            background: linear-gradient(105deg, rgba(8, 20, 32, 0.85) 0%, rgba(8, 20, 32, 0.3) 55%, transparent 75%);
+            display: flex; align-items: flex-end; overflow-y: auto; padding: 20px 0;
+        }
+        #panel {
+            margin: 0 0 4vh 4vw; max-width: 470px; width: min(470px, 92vw);
+            background: linear-gradient(180deg, rgba(14, 34, 48, 0.95), rgba(8, 20, 32, 0.95));
+            border-top: 6px solid #39e2cf; padding: 26px 28px 28px;
+            transform: skewX(-2deg); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        }
+        #panel > * { transform: skewX(2deg); }
+        h1 { font-family: 'Russo One', sans-serif; font-size: clamp(34px, 7vw, 52px); line-height: 0.95; }
+        h1 em { font-style: normal; color: #ffd23f; }
+        .tag { color: #39e2cf; letter-spacing: 0.28em; font-size: 11px; font-weight: 700; margin: 8px 0 14px; }
+        .rules { list-style: none; font-size: 14px; line-height: 1.8; margin-bottom: 16px; }
+        .rules b { color: #ffd23f; }
+        .diffRow { display: flex; gap: 8px; margin-bottom: 18px; }
+        .dBtn {
+            flex: 1; font-size: 13px; padding: 10px 4px; background: rgba(255, 255, 255, 0.08);
+            color: #fbfbf9; box-shadow: none; border: 1px solid rgba(120, 220, 235, 0.35);
+            font-family: 'Russo One', sans-serif; cursor: pointer; border-radius: 4px; transition: 0.2s;
+        }
+        .dBtn.sel {
+            background: #39e2cf; color: #081420; border-color: #39e2cf;
+            box-shadow: 0 4px 0 rgba(10, 90, 85, 0.7);
+        }
+        button {
+            pointer-events: auto; cursor: pointer; font-family: 'Russo One', sans-serif;
+            font-size: 19px; color: #081420; background: #ffd23f; border: none;
+            padding: 14px 34px; transform: skewX(-8deg);
+            box-shadow: 0 6px 0 #b98f14, 0 12px 24px rgba(0, 0, 0, 0.5);
+            transition: transform 0.12s, box-shadow 0.12s, opacity 0.2s; border-radius: 2px;
+        }
+        button span { display: inline-block; transform: skewX(8deg); }
+        button:hover { transform: skewX(-8deg) translateY(-2px); }
+        button:active { transform: skewX(-8deg) translateY(3px); box-shadow: 0 2px 0 #b98f14; }
+        #support {
+            margin-top: 18px; padding: 16px 18px 14px; border-radius: 4px;
+            background: linear-gradient(180deg, rgba(255, 210, 63, 0.06), rgba(57, 226, 207, 0.04));
+            border: 1px dashed rgba(255, 210, 63, 0.45); border-left: 4px solid #ffd23f;
+            font-size: 13px; line-height: 1.55; color: #dbeef3;
+        }
+        #support h3 { font-family: 'Russo One', sans-serif; font-size: 15px; color: #ffd23f; letter-spacing: 0.04em; margin-bottom: 6px; }
+        #support p { margin-bottom: 6px; }
+        #support .phoneBox {
+            margin: 10px 0 8px; padding: 10px 12px; border-radius: 4px;
+            background: rgba(8, 20, 32, 0.6); border: 1px solid rgba(120, 220, 235, 0.25);
+            display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+        }
+        #support .phoneNum { font-family: 'Russo One', sans-serif; font-size: 18px; color: #fff; letter-spacing: 0.04em; word-break: break-all; }
+        #support .copyBtn {
+            pointer-events: auto; cursor: pointer; font-family: 'Russo One', sans-serif;
+            font-size: 12px; color: #081420; background: #ffd23f; border: none;
+            padding: 8px 14px; transform: none; box-shadow: 0 3px 0 rgba(150, 110, 10, 0.6); border-radius: 3px;
+        }
+        #support .copyBtn.ok { background: #39e2cf; }
+        #support .note { font-size: 12px; opacity: 0.75; margin: 4px 0 10px; }
+        #support .thanks { color: #ffd23f; font-weight: 700; margin-top: 8px; }
+        #support .cat { margin-top: 10px; font-size: 12px; opacity: 0.9; }
+        #support a { color: #39e2cf; text-decoration: none; font-weight: 700; word-break: break-all; }
+        #finish {
+            background: rgba(8, 20, 32, 0.6); display: flex; align-items: flex-start;
+            justify-content: center; padding-top: 9vh; backdrop-filter: blur(2px);
+        }
+        #fPanel {
+            max-width: 480px; width: min(480px, 92vw); text-align: center;
+            background: linear-gradient(180deg, rgba(14, 34, 48, 0.96), rgba(8, 20, 32, 0.96));
+            border-top: 6px solid #ffd23f; padding: 26px 26px 28px;
+            transform: skewX(-2deg); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+        }
+        #fPanel > * { transform: skewX(2deg); }
+        #fTitle { font-family: 'Russo One', sans-serif; font-size: clamp(24px, 5.5vw, 36px); color: #ffd23f; }
+        #fTime {
+            font-family: 'Russo One', sans-serif; font-size: clamp(40px, 9vw, 58px);
+            color: #39e2cf; margin: 4px 0 2px; text-shadow: 0 0 26px rgba(57, 226, 207, 0.5);
+        }
+        #fPlace { font-family: 'Russo One', sans-serif; font-size: clamp(17px, 4.5vw, 23px); color: #ffd23f; margin-bottom: 8px; min-height: 1.3em; }
+        #fWinner { margin: 0 0 10px; font-weight: 700; font-size: 15px; }
+        #fRows { margin: 4px 0 14px; text-align: left; }
+        .fRow {
+            display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.05); border-left: 3px solid transparent; transform: skewX(-4deg);
+        }
+        .fRow > * { transform: skewX(4deg); }
+        .fRow.you { background: rgba(255, 210, 63, 0.13); border-left-color: #ffd23f; }
+        .fPos { font-size: 18px; width: 32px; text-align: center; }
+        .fName { flex: 1; font-weight: 700; }
+        .fDot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+        .fT { font-family: 'Russo One', sans-serif; color: #39e2cf; }
+        #fBest { margin: 2px 0 4px; font-size: 14px; opacity: 0.9; }
+        #fBest.rec { color: #ffd23f; font-weight: 700; }
+        #fStats { font-size: 13px; opacity: 0.75; margin-bottom: 18px; }
+        #sndBtn {
+            position: fixed; right: 14px; top: 84px; z-index: 12; width: 42px; height: 42px;
+            padding: 0; font-size: 18px; background: rgba(14, 34, 48, 0.9); color: #fbfbf9;
+            box-shadow: 0 3px 0 rgba(0, 0, 0, 0.6); border: 1px solid rgba(120, 220, 235, 0.3);
+            border-radius: 50%; transform: none;
+        }
+        #sndBtn:hover { transform: none; }
+        #sndBtn span { transform: none; }
+        body.locked button, body.locked .dBtn, body.locked .copyBtn, body.locked a {
+            pointer-events: none !important; opacity: 0.55 !important;
+        }
+        body.locked #sndBtn { pointer-events: auto !important; opacity: 0.7 !important; }
+        @media (max-width: 640px) {
+            #panel { margin: 0 4vw 4vh; }
+            #support .phoneNum { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="vig"></div>
+    <div id="credit">🎣 РЫБАЛКА·5 — HTML5 3D ИГРА</div>
+    
+    <div id="logo">
+        <img src="favicon.ico" alt="Рыбалка 5" onerror="this.style.display='none'">
+    </div>
+
+    <div id="hud">
+        <div id="topbar">
+            <div class="chip"><span class="lbl">🐟 ОЧКИ</span><span class="val" id="score">0</span></div>
+            <div class="chip"><span class="lbl">УЛОВ</span><span class="val" id="catch">—</span></div>
+        </div>
+        <div id="bottombar">
+            <div id="hint"><span class="only-key"><span class="key">ПРОБЕЛ</span> — заброс / подсечка</span><span class="only-touch">ТАП — заброс / подсечка</span></div>
+        </div>
+    </div>
+
+    <div id="cd"><span id="cdTxt"></span></div>
+    <div id="msg"><span id="msgTxt"></span></div>
+
+    <div class="ovl" id="menu">
+        <div id="panel">
+            <h1>РЫБАЛКА<em>·5</em></h1>
+            <p class="tag">ОЗЕРО · 5 ЗАБРОСОВ</p>
+            <ul class="rules">
+                <li>🎣 <b>ПРОБЕЛ/ТАП</b> — забросить удочку</li>
+                <li>⏳ Жди поклёвку… поплавок может дёргаться <b>впустую</b> — не клюй!</li>
+                <li>❗ Поплавок <b>утонул</b> и крик «Клюёт!» — жми подсечку!</li>
+                <li>🐟 Карась=1, окунь=2, лещ=3, щука=5, <b>золотая=10</b></li>
+                <li>💀 «СЛОЖНЫЙ ×2» — окно подсечки крошечное, но рыба жирнее</li>
+            </ul>
+            <div class="diffRow">
+                <button class="dBtn" data-d="easy"><span>ЛЁГКИЙ</span></button>
+                <button class="dBtn" data-d="mid"><span>СРЕДНИЙ</span></button>
+                <button class="dBtn" data-d="hard"><span>СЛОЖНЫЙ ×2</span></button>
+            </div>
+            <button id="startBtn"><span>▶ НА СТАРТ</span></button>
+
+            <div id="support">
+                <h3>🤝 ПОДДЕРЖАТЬ ПРОЕКТ 💙</h3>
+                <p>Приложение бесплатное. Было и останется.</p>
+                <p>Если проект помог вам или вашим близким — можете поддержать разработку добровольным переводом.</p>
+                <div class="phoneBox">
+                    <span class="phoneNum" id="phoneNum">📱 8-920-227-56-76</span>
+                    <button class="copyBtn" id="copyBtn">📋 Копировать номер</button>
+                </div>
+                <p class="note">✅ Деньги придут мгновенно. Без комиссии. Безопасно.</p>
+                <p class="thanks">❤️ Спасибо за поддержку!</p>
+                <p class="cat">🌟 <a href="https://ancf-hue.github.io/" target="_blank" rel="noopener">https://ancf-hue.github.io/</a><br>Каталог бесплатных офлайн-приложений Anti-AI Shield.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="ovl hide" id="finish">
+        <div id="fPanel">
+            <div id="fTitle">ИГРА ОКОНЧЕНА</div>
+            <div id="fTime">0</div>
+            <div id="fPlace"></div>
+            <div id="fWinner"></div>
+            <div id="fRows"></div>
+            <div id="fBest"></div>
+            <div id="fStats"></div>
+            <button id="menuBtn"><span>🏠 В МЕНЮ</span></button>
+        </div>
+    </div>
+
+    <button id="sndBtn">🔊</button>
+
+    <!-- УМНАЯ ЗАГРУЗКА THREE.JS: Сначала локальный файл (офлайн), потом CDN (онлайн) -->
+    <script>
+        (function() {
+            var s = document.createElement('script');
+            s.src = 'three.min.js'; 
+            s.onload = function() { window.dispatchEvent(new Event('three-ready')); };
+            s.onerror = function() {
+                var s2 = document.createElement('script');
+                s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+                s2.onload = function() { window.dispatchEvent(new Event('three-ready')); };
+                s2.onerror = function() {
+                    document.body.innerHTML = '<div style="color:#fff;padding:40px;font-family:sans-serif;text-align:center">'
+                        + '<h1 style="color:#ffd23f">⚠ Ошибка загрузки</h1>'
+                        + '<p>Не удалось загрузить 3D-движок. Проверьте интернет или положите файл three.min.js рядом с index.html</p></div>';
+                };
+                document.head.appendChild(s2);
+            };
+            document.head.appendChild(s);
+        })();
+    </script>
+
+    <!-- ОСНОВНОЙ КОД ИГРЫ -->
+    <script>
+        window.addEventListener('three-ready', function() {
+            (function() {
+                'use strict';
+                const CASTS = 5;
+                let state = 'menu', T = 0, races = 0, uiLocked = false, lockToken = 0;
+
+                const DIFFS = {
+                    easy: { name: 'ЛЁГКИЙ', win: 1.2, fakes: 1, w: [40, 30, 20, 9, 1], ai: 6 },
+                    mid: { name: 'СРЕДНИЙ', win: 0.9, fakes: 2, w: [25, 30, 25, 15, 5], ai: 10 },
+                    hard: { name: 'СЛОЖНЫЙ ×2', win: 0.5, fakes: 3, w: [15, 25, 30, 22, 8], ai: 15 },
+                };
+                const FISH = [
+                    { name: 'КАРАСЬ', pts: 1, col: 0xb8b8c0 },
+                    { name: 'ОКУНЬ', pts: 2, col: 0x4cd964 },
+                    { name: 'ЛЕЩ', pts: 3, col: 0xd0a060 },
+                    { name: 'ЩУКА', pts: 5, col: 0x2a8fff },
+                    { name: 'ЗОЛОТАЯ', pts: 10, col: 0xffd23f },
+                ];
+
+                let diff = localStorage.getItem('fish_diff') || 'mid';
+                if (!DIFFS[diff]) diff = 'mid';
+                races = parseInt(localStorage.getItem('fish_races') || '0', 10) || 0;
+                const aiSkill = () => Math.min(1.3, 1 + races * 0.04);
+
+                function ptsWord(n) {
+                    const abs = Math.abs(n), last2 = abs % 100, last1 = abs % 10;
+                    if (last2 >= 11 && last2 <= 19) return 'очков';
+                    if (last1 === 1) return 'очко';
+                    if (last1 >= 2 && last1 <= 4) return 'очка';
+                    return 'очков';
+                }
+
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+                renderer.setSize(innerWidth, innerHeight);
+                renderer.shadowMap.enabled = true;
+                renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                renderer.outputEncoding = THREE.sRGBEncoding;
+                document.body.appendChild(renderer.domElement);
+
+                const scene = new THREE.Scene();
+                scene.fog = new THREE.Fog(0xd8ecf2, 60, 200);
+                const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 500);
+
+                scene.add(new THREE.HemisphereLight(0xcfeeff, 0x2a5d6c, 1));
+                const sun = new THREE.DirectionalLight(0xfff0d0, 1.2);
+                sun.castShadow = true;
+                sun.shadow.mapSize.set(1024, 1024);
+                Object.assign(sun.shadow.camera, { left: -15, right: 15, top: 15, bottom: -8, near: 1, far: 60 });
+                sun.position.set(-8, 10, -8);
+                scene.add(sun);
+                scene.add(sun.target);
+                sun.target.position.set(0, 0, 2);
+
+                function canvasTex(w, h, fn) {
+                    const c = document.createElement('canvas');
+                    c.width = w; c.height = h;
+                    fn(c.getContext('2d'), w, h);
+                    const t = new THREE.CanvasTexture(c);
+                    t.encoding = THREE.sRGBEncoding;
+                    return t;
+                }
+                const skyTex = canvasTex(512, 512, (x, w, h) => {
+                    const g = x.createLinearGradient(0, 0, 0, h);
+                    g.addColorStop(0, '#2e7fc4'); g.addColorStop(0.45, '#79c3e8');
+                    g.addColorStop(0.75, '#dff2f0'); g.addColorStop(1, '#e8f3d8');
+                    x.fillStyle = g; x.fillRect(0, 0, w, h);
+                    x.fillStyle = 'rgba(255,255,240,0.9)';
+                    x.beginPath(); x.arc(w * 0.3, h * 0.3, 34, 0, 7); x.fill();
+                });
+                const dotTex = canvasTex(64, 64, (x, w, h) => {
+                    const g = x.createRadialGradient(32, 32, 2, 32, 32, 30);
+                    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+                    x.fillStyle = g; x.fillRect(0, 0, w, h);
+                });
+                const woodTex = canvasTex(256, 256, (x, w, h) => {
+                    x.fillStyle = '#8a5a33'; x.fillRect(0, 0, w, h);
+                    x.strokeStyle = 'rgba(60,35,15,0.6)'; x.lineWidth = 3;
+                    for (let i = 0; i < 6; i++) { x.beginPath(); x.moveTo(0, i * (h / 6)); x.lineTo(w, i * (h / 6)); x.stroke(); }
+                    for (let i = 0; i < 40; i++) {
+                        x.strokeStyle = 'rgba(70,40,20,0.4)'; x.beginPath();
+                        const yy = Math.random() * h; x.moveTo(0, yy); x.lineTo(w, yy + 4); x.stroke();
+                    }
+                });
+                const grassTex = canvasTex(256, 256, (x, w, h) => {
+                    x.fillStyle = '#4a8a3a'; x.fillRect(0, 0, w, h);
+                    for (let i = 0; i < 2500; i++) {
+                        x.fillStyle = `rgba(${40 + Math.random() * 60},${80 + Math.random() * 70},${30 + Math.random() * 40},${0.3 + Math.random() * 0.4})`;
+                        x.fillRect(Math.random() * w, Math.random() * h, 1.5, 3);
+                    }
+                });
+                grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
+                grassTex.repeat.set(20, 20);
+
+                const dome = new THREE.Mesh(new THREE.SphereGeometry(300, 24, 14),
+                    new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false }));
+                scene.add(dome);
+
+                const waterGeo = new THREE.PlaneGeometry(120, 120, 60, 60);
+                const water = new THREE.Mesh(waterGeo, new THREE.MeshPhongMaterial({
+                    color: 0x1e78c8, transparent: true, opacity: 0.82, shininess: 140, specular: 0xbfefff, depthWrite: false
+                }));
+                water.rotation.x = -Math.PI / 2; water.position.set(0, 0, 20);
+                water.renderOrder = 10; scene.add(water);
+                const wPos = waterGeo.attributes.position;
+
+                const shore = new THREE.Mesh(new THREE.PlaneGeometry(120, 30), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.95 }));
+                shore.rotation.x = -Math.PI / 2; shore.position.set(0, 0.08, -19); shore.receiveShadow = true; scene.add(shore);
+                const sand = new THREE.Mesh(new THREE.PlaneGeometry(120, 1.6), new THREE.MeshStandardMaterial({ color: 0xd8c490, roughness: 1 }));
+                sand.rotation.x = -Math.PI / 2; sand.position.set(0, 0.06, -4.2); scene.add(sand);
+
+                const woodM = new THREE.MeshStandardMaterial({ map: woodTex, roughness: 0.8 });
+                const dock = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 6), woodM);
+                dock.position.set(0, 0.88, -2.5); dock.castShadow = true; dock.receiveShadow = true; scene.add(dock);
+                for (const px of [-1, 1]) for (const pz of [-4.5, -0.8]) {
+                    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 1.7, 8), woodM);
+                    p.position.set(px * 1, 0.15, pz); scene.add(p);
+                }
+
+                const fisher = new THREE.Group();
+                fisher.position.set(0, 1.565, -3.2); scene.add(fisher);
+                const skinM = new THREE.MeshStandardMaterial({ color: 0xe8b48c, roughness: 0.55 });
+                const jackM = new THREE.MeshStandardMaterial({ color: 0x9333ea, roughness: 0.6 });
+                const bootM = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+
+                function add(par, geo, mat, p, r) {
+                    const m = new THREE.Mesh(geo, mat);
+                    if (p) m.position.set(...p); if (r) m.rotation.set(...r);
+                    m.castShadow = true; par.add(m); return m;
+                }
+
+                add(fisher, new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x3a4a5a }), [-0.12, -0.29, 0]);
+                add(fisher, new THREE.CylinderGeometry(0.09, 0.09, 0.5, 8), new THREE.MeshStandardMaterial({ color: 0x3a4a5a }), [0.12, -0.29, 0]);
+                add(fisher, new THREE.BoxGeometry(0.14, 0.08, 0.28), bootM, [-0.12, -0.57, 0.04]);
+                add(fisher, new THREE.BoxGeometry(0.14, 0.08, 0.28), bootM, [0.12, -0.57, 0.04]);
+                add(fisher, new THREE.CylinderGeometry(0.2, 0.24, 0.6, 10), jackM, [0, 0.15, 0]);
+
+                const fHead = add(fisher, new THREE.SphereGeometry(0.19, 14, 12), skinM, [0, 0.62, 0]);
+                add(fisher, new THREE.CylinderGeometry(0.24, 0.26, 0.12, 12), new THREE.MeshStandardMaterial({ color: 0xffd23f, roughness: 0.6 }), [0, 0.74, 0]);
+                add(fisher, new THREE.CylinderGeometry(0.16, 0.18, 0.16, 12), new THREE.MeshStandardMaterial({ color: 0xffd23f }), [0, 0.84, 0]);
+
+                const eyeW = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25 });
+                const eyeP = new THREE.MeshStandardMaterial({ color: 0x101820, roughness: 0.3 });
+                const face = new THREE.Group(); fHead.add(face);
+                const eyes = [];
+                for (const s of [-1, 1]) {
+                    const eg = new THREE.Group(); eg.position.set(s * 0.07, 0.03, 0.16); face.add(eg);
+                    eg.add(new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), eyeW));
+                    const p = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), eyeP);
+                    p.position.z = 0.026; eg.add(p); eyes.push(eg);
+                }
+                const nose = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 6), new THREE.MeshStandardMaterial({ color: 0xd89b72, roughness: 0.6 }));
+                nose.position.set(0, -0.01, 0.19); face.add(nose);
+                const smile = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.009, 6, 12, Math.PI), new THREE.MeshStandardMaterial({ color: 0x8c3b34, roughness: 0.5 }));
+                smile.rotation.z = Math.PI; smile.position.set(0, -0.08, 0.17); face.add(smile);
+
+                add(fisher, new THREE.CylinderGeometry(0.05, 0.055, 0.45, 8), jackM, [0.16, 0.28, 0.15], [1.1, 0, -0.4]);
+                add(fisher, new THREE.CylinderGeometry(0.05, 0.055, 0.45, 8), jackM, [-0.16, 0.28, 0.15], [1.1, 0, 0.4]);
+
+                const rod = add(fisher, new THREE.CylinderGeometry(0.015, 0.025, 2.6, 6), new THREE.MeshStandardMaterial({ color: 0x333333 }), [0.1, 0.9, 0.9], [1.15, 0, 0]);
+                const ROD_TIP = new THREE.Vector3(0.1, 2.7, -1.1);
+                add(fisher, new THREE.CylinderGeometry(0.22, 0.18, 0.3, 12), new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.4, roughness: 0.5 }), [-0.7, -0.46, 0.3]);
+
+                const lineGeo = new THREE.BufferGeometry();
+                lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+                const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 }));
+                scene.add(line);
+                const FLOAT_POS = new THREE.Vector3(0, 0, 2.2);
+                const floatG = new THREE.Group(); scene.add(floatG);
+                const floatBody = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshStandardMaterial({ color: 0xd21f1f, roughness: 0.3 }));
+                floatG.add(floatBody);
+                const floatTop = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+                floatTop.position.y = 0.14; floatG.add(floatTop);
+                floatG.visible = false;
+
+                const fishG = new THREE.Group(); scene.add(fishG); fishG.visible = false;
+                const fishBody = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), new THREE.MeshStandardMaterial({ color: 0x4cd964, roughness: 0.4 }));
+                fishBody.scale.set(0.6, 1, 1.8); fishG.add(fishBody);
+                const fishTail = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0x4cd964, roughness: 0.4 }));
+                fishTail.rotation.x = -Math.PI / 2; fishTail.position.z = -0.6; fishG.add(fishTail);
+                const fishEye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), eyeP);
+                fishEye.position.set(0.12, 0.1, 0.4); fishG.add(fishEye);
+
+                {
+                    const d = new THREE.Object3D(); const reeds = [];
+                    for (let i = 0; i < 120; i++) {
+                        const side = Math.random() < 0.5 ? -1 : 1;
+                        reeds.push([side * (8 + Math.random() * 8), Math.random() * 30, 0.8 + Math.random() * 0.8]);
+                    }
+                    const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.02, 0.05, 1.6, 5), new THREE.MeshStandardMaterial({ color: 0x6a8a3a, roughness: 0.9 }), reeds.length);
+                    reeds.forEach((p, k) => { d.position.set(p[0], p[2] * 0.4, p[1]); d.scale.setScalar(p[2]); d.updateMatrix(); im.setMatrixAt(k, d.matrix); });
+                    scene.add(im);
+                }
+                for (let i = 0; i < 5; i++) {
+                    const cl = new THREE.Sprite(new THREE.SpriteMaterial({ map: dotTex, transparent: true, opacity: 0.5, color: 0xffffff }));
+                    cl.scale.set(18, 6, 1); cl.position.set(-40 + i * 22, 14 + Math.random() * 6, -30 + Math.random() * 20);
+                    scene.add(cl);
+                }
+
+                const PMAX = 300;
+                const pGeo = new THREE.BufferGeometry();
+                const pPos = new Float32Array(PMAX * 3), pCol = new Float32Array(PMAX * 3),
+                      pVel = new Float32Array(PMAX * 3), pLife = new Float32Array(PMAX), pMax = new Float32Array(PMAX);
+                pPos.fill(-999);
+                pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+                pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+                const points = new THREE.Points(pGeo, new THREE.PointsMaterial({
+                    size: 0.25, map: dotTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: true
+                }));
+                points.frustumCulled = false; points.renderOrder = 11; scene.add(points);
+                let pCur = 0;
+
+                function splash(x, z, n, pow) {
+                    for (let i = 0; i < n; i++) {
+                        const a = Math.random() * Math.PI * 2, sp = (0.4 + Math.random() * 0.6) * pow;
+                        const j = pCur++ % PMAX, i3 = j * 3;
+                        pPos[i3] = x; pPos[i3 + 1] = 0.05; pPos[i3 + 2] = z;
+                        pVel[i3] = Math.cos(a) * sp * 0.6; pVel[i3 + 1] = 1 + Math.random() * 2 * pow; pVel[i3 + 2] = Math.sin(a) * sp * 0.6;
+                        pLife[j] = pMax[j] = 0.4 + Math.random() * 0.3;
+                        pCol[i3] = 0.8; pCol[i3 + 1] = 0.95; pCol[i3 + 2] = 1;
+                    }
+                }
+                const rings = [];
+                for (let i = 0; i < 8; i++) {
+                    const r = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.62, 32), new THREE.MeshBasicMaterial({ color: 0xdffcff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+                    r.rotation.x = -Math.PI / 2; r.position.y = 0.04; r.renderOrder = 11; r.visible = false;
+                    scene.add(r); rings.push({ m: r, life: 0 });
+                }
+                function ring(x, z) {
+                    const r = rings.find(r => r.life <= 0) || rings[0];
+                    r.life = 1; r.m.visible = true; r.m.position.set(x, 0.04, z); r.m.scale.setScalar(0.4); r.m.material.opacity = 0.5;
+                }
+
+                let AC = null, muted = false, noiseBuf = null;
+                function ac() {
+                    if (!AC) {
+                        AC = new(window.AudioContext || window.webkitAudioContext)();
+                        noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.3, AC.sampleRate);
+                        const d = noiseBuf.getChannelData(0);
+                        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                    }
+                    if (AC.state === 'suspended') AC.resume();
+                    return AC;
+                }
+                function splashSnd() {
+                    if (muted) return;
+                    const c = ac(), t = c.currentTime;
+                    const s = c.createBufferSource(); s.buffer = noiseBuf;
+                    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700 + Math.random() * 500; f.Q.value = 0.8;
+                    const g = c.createGain(); g.gain.setValueAtTime(0.35, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+                    s.connect(f); f.connect(g); g.connect(c.destination); s.start(t); s.stop(t + 0.3);
+                }
+                function plop() {
+                    if (muted) return;
+                    const c = ac(), t = c.currentTime;
+                    const o = c.createOscillator(), g = c.createGain();
+                    o.type = 'sine'; o.frequency.setValueAtTime(600, t); o.frequency.exponentialRampToValueAtTime(150, t + 0.12);
+                    g.gain.setValueAtTime(0.4, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.14);
+                    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + 0.15);
+                }
+                function fanfare() { beep(784, 0.12); beep(988, 0.12, 0.12); beep(1175, 0.25, 0.24); }
+                function beep(f, d = 0.12, dl = 0, v = 0.22) {
+                    if (muted) return;
+                    const c = ac(), t = c.currentTime + dl;
+                    const o = c.createOscillator(), g = c.createGain();
+                    o.type = 'square'; o.frequency.value = f;
+                    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.01, t + d);
+                    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + d);
+                }
+
+                let ruVoice = null;
+                if ('speechSynthesis' in window) {
+                    const pick = () => { ruVoice = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().indexOf('ru') === 0) || null; };
+                    pick(); speechSynthesis.onvoiceschanged = pick;
+                }
+                function unlockUI() { document.body.classList.remove('locked'); uiLocked = false; }
+                function speak(text, r = 1, p = 1) {
+                    if (muted || !('speechSynthesis' in window)) return;
+                    try {
+                        speechSynthesis.cancel();
+                        const u = new SpeechSynthesisUtterance(text);
+                        u.lang = 'ru-RU'; if (ruVoice) u.voice = ruVoice;
+                        u.rate = r; u.pitch = p; u.volume = 1;
+                        const my = ++lockToken;
+                        document.body.classList.add('locked'); uiLocked = true;
+                        const done = () => { if (my === lockToken) unlockUI(); };
+                        u.onend = done; u.onerror = done;
+                        setTimeout(done, Math.min(6000, 900 + text.length * 95 / (r || 1)));
+                        speechSynthesis.speak(u);
+                    } catch (e) { lockToken++; unlockUI(); }
+                }
+                function stopSpeak() {
+                    if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
+                    lockToken++; unlockUI();
+                }
+                document.getElementById('sndBtn').addEventListener('pointerdown', e => {
+                    e.stopPropagation(); muted = !muted; e.target.textContent = muted ? '🔇' : '🔊';
+                    if (muted) stopSpeak(); else ac();
+                });
+
+                const $ = id => document.getElementById(id);
+                const hud = $('hud'), scoreEl = $('score'), catchEl = $('catch'), cdTxt = $('cdTxt'), msgTxt = $('msgTxt'), menuOvl = $('menu'), finOvl = $('finish'), fRows = $('fRows');
+                const copyBtn = $('copyBtn'), phoneRaw = '89202275676';
+                copyBtn.addEventListener('click', async e => {
+                    if (uiLocked) { e.preventDefault(); return; }
+                    e.stopPropagation();
+                    try {
+                        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(phoneRaw);
+                        else {
+                            const ta = document.createElement('textarea'); ta.value = phoneRaw; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                            document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                        }
+                        copyBtn.textContent = '✅ Скопировано!'; copyBtn.classList.add('ok');
+                        setTimeout(() => { copyBtn.textContent = '📋 Копировать номер'; copyBtn.classList.remove('ok'); }, 2200);
+                    } catch (err) { copyBtn.textContent = '⚠ Вручную'; setTimeout(() => copyBtn.textContent = '📋 Копировать номер', 2500); }
+                });
+
+                function updateDiffUI() { document.querySelectorAll('.dBtn').forEach(b => b.classList.toggle('sel', b.dataset.d === diff)); }
+                document.querySelectorAll('.dBtn').forEach(b => b.addEventListener('click', () => {
+                    if (uiLocked) return; diff = b.dataset.d; localStorage.setItem('fish_diff', diff); updateDiffUI();
+                }));
+                updateDiffUI();
+
+                const G = { cast: 0, score: 0, phase: 'idle', t: 0, waitDur: 0, fakeAt: 0, fakeDone: false, fakeT: 0, biteWin: 0, castT: 0, catches: [], ai1: 0, ai2: 0, fishT: 0, fish: null };
+                function cdShow(t) { cdTxt.textContent = t; cdTxt.classList.remove('pop'); void cdTxt.offsetWidth; cdTxt.classList.add('pop'); }
+                function msgShow(t) { msgTxt.textContent = t; msgTxt.classList.remove('pop'); void msgTxt.offsetWidth; msgTxt.classList.add('pop'); }
+                function pickFish() {
+                    const w = DIFFS[diff].w; let s = 0; w.forEach(v => s += v); let r = Math.random() * s;
+                    for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return FISH[i]; }
+                    return FISH[0];
+                }
+
+                function startGame() {
+                    stopSpeak(); const sk = aiSkill(), D = DIFFS[diff];
+                    G.cast = 0; G.score = 0; G.catches = [];
+                    G.ai1 = Math.round(D.ai * sk * (0.8 + Math.random() * 0.4));
+                    G.ai2 = Math.round(D.ai * 0.85 * sk * (0.8 + Math.random() * 0.4));
+                    scoreEl.textContent = '0'; catchEl.textContent = '—';
+                    menuOvl.classList.add('hide'); finOvl.classList.add('hide'); hud.classList.add('on');
+                    state = 'count'; cdShow('ГОТОВ?'); speak('Рыбалка начинается!', 0.95);
+                    setTimeout(() => { cdShow('ЗАБРАСЫВАЙ!'); beep(1240, 0.3); state = 'play'; nextCast(); }, 1200);
+                }
+                function nextCast() { G.cast++; if (G.cast > CASTS) { finishGame(); return; } G.phase = 'idle'; floatG.visible = false; }
+                function doCast() { G.phase = 'cast'; G.castT = 0; G.waitDur = 1.5 + Math.random() * 3; G.fakeAt = 0.4 + Math.random() * 0.5; G.fakeDone = false; G.fakeT = 0; beep(500, 0.06); }
+                function resolveCatch() {
+                    if (navigator.vibrate) navigator.vibrate([50, 30, 50]); // Вибрация при успехе
+                    const f = pickFish(); G.score += f.pts; G.catches.push(f.name);
+                    scoreEl.textContent = G.score; catchEl.textContent = f.name;
+                    msgShow(f.name + '! +' + f.pts); speak(f.name + '! Плюс ' + f.pts + ' ' + ptsWord(f.pts), 1.05, 1.2);
+                    fanfare(); G.fish = f; G.fishT = 0; fishG.visible = true;
+                    fishBody.material.color.setHex(f.col); fishTail.material.color.setHex(f.col);
+                    splash(FLOAT_POS.x, FLOAT_POS.z, 20, 1.3); ring(FLOAT_POS.x, FLOAT_POS.z);
+                    G.phase = 'done'; G.t = 0;
+                }
+                function fail(msg, sp) {
+                    if (navigator.vibrate) navigator.vibrate(100); // Вибрация при ошибке
+                    msgShow(msg); speak(sp, 1.1, 0.85); splash(FLOAT_POS.x, FLOAT_POS.z, 8, 0.7);
+                    G.phase = 'done'; G.t = 0; G.fish = null;
+                }
+                function finishGame() {
+                    state = 'fin'; races++; localStorage.setItem('fish_races', String(races));
+                    msgShow('ФИНИШ!'); beep(523, 0.12); beep(659, 0.12, 0.13); beep(784, 0.28, 0.26);
+                    setTimeout(() => {
+                        const list = [{ name: 'ТЫ', c: 0xffd23f, s: G.score, you: 1, sp: 'ты' }, { name: 'РЕКС', c: 0xff3b30, s: G.ai1, sp: 'Рекс' }, { name: 'МАКС', c: 0x2a8fff, s: G.ai2, sp: 'Макс' }].sort((a, b) => b.s - a.s);
+                        fRows.innerHTML = list.map((r, k) => `<div class="fRow${r.you ? ' you' : ''}"><span class="fPos">${['🥇','',''][k]}</span><span class="fName"><i class="fDot" style="background:#${r.c.toString(16).padStart(6, '0')}"></i>${r.name}</span><span class="fT">${r.s} 🐟</span></div>`).join('');
+                        const myPos = list.findIndex(r => r.you) + 1;
+                        $('fTime').textContent = G.score + ' 🐟';
+                        $('fPlace').textContent = ['ЗОЛОТО!', 'СЕРЕБРО', 'БРОНЗА'][myPos - 1] + ' · ' + myPos + '-е место';
+                        const w = list[0]; $('fWinner').textContent = '🏆 Победитель: ' + w.name + ' (' + w.s + ')';
+                        const best = parseInt(localStorage.getItem('fish_best') || '0', 10);
+                        const bEl = $('fBest');
+                        if (G.score > best) { localStorage.setItem('fish_best', String(G.score)); bEl.textContent = '🎉 НОВЫЙ РЕКОРД!'; bEl.className = 'rec'; }
+                        else { bEl.textContent = 'Рекорд: ' + best; bEl.className = ''; }
+                        $('fStats').textContent = 'Сложность: ' + DIFFS[diff].name + ' · улов: ' + (G.catches.join(', ') || 'пусто');
+                        finOvl.classList.remove('hide');
+                        const placeSp = ['Ты занял первое место.', 'Ты занял второе место.', 'Ты занял третье место.'][myPos - 1];
+                        speak('Игра окончена. ' + placeSp + (w.you ? ' Победил ты!' : ' Победил ' + w.sp + '.'), 1, 1);
+                    }, 900);
+                }
+                function toMenu() { state = 'menu'; stopSpeak(); finOvl.classList.add('hide'); menuOvl.classList.remove('hide'); hud.classList.remove('on'); }
+                function input() {
+                    ac(); if (state !== 'play') return;
+                    if (G.phase === 'idle') doCast();
+                    else if (G.phase === 'wait') { if (G.fakeT > 0) fail('ЛОЖНАЯ ПОКЛЁВКА!', 'Ложная поклёвка! Рано!'); else fail('РАНО! Рыба испугалась', 'Рано! Рыба испугалась'); }
+                    else if (G.phase === 'bite') resolveCatch();
+                }
+
+                addEventListener('keydown', e => {
+                    if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { if (state === 'menu') startGame(); else input(); } }
+                    if (e.code === 'Enter' && state === 'menu' && !uiLocked) startGame();
+                });
+                addEventListener('pointerdown', e => {
+                    if (e.target.id === 'sndBtn') return;
+                    if (e.target.closest('button') || e.target.closest('a')) return;
+                    ac(); if (state === 'menu') startGame(); else input();
+                });
+                $('startBtn').addEventListener('click', (e) => { if (uiLocked) { e.preventDefault(); return; } ac(); startGame(); });
+                $('menuBtn').addEventListener('click', (e) => { if (uiLocked) { e.preventDefault(); return; } ac(); toMenu(); });
+
+                const clock = new THREE.Clock(); let blink = 2;
+                function tick() {
+                    requestAnimationFrame(tick);
+                    const dt = Math.min(clock.getDelta(), 0.05); T += dt;
+                    for (let i = 0; i < wPos.count; i++) {
+                        const x = wPos.getX(i), y = wPos.getY(i);
+                        wPos.setZ(i, 0.05 * Math.sin(x * 0.7 + T * 1.4) + 0.04 * Math.sin(y * 0.6 - T * 1.1) + 0.02 * Math.sin((x + y) * 0.8 + T * 2));
+                    }
+                    wPos.needsUpdate = true; waterGeo.computeVertexNormals();
+
+                    if (state === 'play') {
+                        G.t += dt; const D = DIFFS[diff];
+                        if (G.phase === 'cast') {
+                            G.castT += dt; const t = Math.min(1, G.castT / 0.45); floatG.visible = true; const a = 1 - t;
+                            floatG.position.set(a * a * ROD_TIP.x + 2 * a * t * 0.3 + t * t * FLOAT_POS.x, a * a * ROD_TIP.y + 2 * a * t * 2.75 + t * t * 0.06, a * a * ROD_TIP.z + 2 * a * t * 1.2 + t * t * FLOAT_POS.z);
+                            if (t >= 1) { splash(FLOAT_POS.x, FLOAT_POS.z, 10, 0.8); ring(FLOAT_POS.x, FLOAT_POS.z); plop(); G.phase = 'wait'; G.t = 0; }
+                        } else if (G.phase === 'wait') {
+                            floatG.position.set(FLOAT_POS.x, 0.06 + Math.sin(T * 2.5) * 0.03, FLOAT_POS.z);
+                            if (!G.fakeDone && G.t > G.waitDur * G.fakeAt) { G.fakeDone = true; G.fakeT = 0.5; floatG.position.y -= 0.08; splash(FLOAT_POS.x, FLOAT_POS.z, 4, 0.4); ring(FLOAT_POS.x, FLOAT_POS.z); plop(); }
+                            if (G.fakeT > 0) G.fakeT -= dt;
+                            if (G.t >= G.waitDur) { G.phase = 'bite'; G.biteWin = D.win; G.t = 0; floatG.position.y = -0.22; splash(FLOAT_POS.x, FLOAT_POS.z, 12, 1); ring(FLOAT_POS.x, FLOAT_POS.z); splashSnd(); speak('Клюёт!', 1.3, 1.4); }
+                        } else if (G.phase === 'bite') {
+                            floatG.position.set(FLOAT_POS.x, -0.2 + Math.sin(T * 20) * 0.05, FLOAT_POS.z); G.biteWin -= dt;
+                            if (G.biteWin <= 0) fail('УШЛА!', 'Ушла!');
+                        } else if (G.phase === 'done') {
+                            floatG.visible = false;
+                            if (G.fish) {
+                                G.fishT += dt / 0.9; const t = Math.min(1, G.fishT);
+                                fishG.position.set(FLOAT_POS.x, 0.3 + Math.sin(t * Math.PI) * 2.2, FLOAT_POS.z); fishG.rotation.z = t * Math.PI * 2;
+                                if (t >= 1) { fishG.visible = false; G.fish = null; }
+                            }
+                            if (G.t > 1.4) nextCast();
+                        }
+                    }
+                    const lp = lineGeo.attributes.position;
+                    lp.setXYZ(0, ROD_TIP.x, ROD_TIP.y, ROD_TIP.z);
+                    if (floatG.visible) lp.setXYZ(1, floatG.position.x, floatG.position.y + 0.1, floatG.position.z);
+                    else lp.setXYZ(1, ROD_TIP.x, ROD_TIP.y - 0.6, ROD_TIP.z + 0.3);
+                    lp.needsUpdate = true;
+
+                    rings.forEach(r => { if (r.life > 0) { r.life -= dt; r.m.scale.setScalar(r.m.scale.x + dt * 1.8); r.m.material.opacity = Math.max(0, r.life * 0.5); if (r.life <= 0) r.m.visible = false; } });
+                    for (let i = 0; i < PMAX; i++) {
+                        if (pLife[i] > 0) {
+                            pLife[i] -= dt; if (pLife[i] <= 0) { pPos[i * 3 + 1] = -999; continue; }
+                            const i3 = i * 3; pVel[i3 + 1] -= 6 * dt;
+                            pPos[i3] += pVel[i3] * dt; pPos[i3 + 1] += pVel[i3 + 1] * dt; pPos[i3 + 2] += pVel[i3 + 2] * dt;
+                            if (pPos[i3 + 1] < 0.02 && pVel[i3 + 1] < 0) { pPos[i3 + 1] = 0.02; pVel[i3 + 1] *= -0.3; }
+                            const f = pLife[i] / pMax[i]; pCol[i3] *= f > 0.9 ? 1 : f / 0.9; pCol[i3 + 1] *= f > 0.9 ? 1 : f / 0.9; pCol[i3 + 2] *= f > 0.9 ? 1 : f / 0.9;
+                        }
+                    }
+                    pGeo.attributes.position.needsUpdate = true; pGeo.attributes.color.needsUpdate = true;
+                    rod.rotation.x = 1.15 + (G.phase === 'bite' ? Math.sin(T * 25) * 0.08 : 0);
+                    blink -= dt; if (blink < 0) blink = 2 + Math.random() * 3;
+                    const bl = blink < 0.12 ? 0.15 : 1;
+                    eyes.forEach(e => { e.scale.y += (bl - e.scale.y) * Math.min(1, dt * 25); });
+
+                    if (state === 'menu') {
+                        const a = T * 0.2;
+                        camera.position.lerp(new THREE.Vector3(Math.sin(a) * 10, 4.3, Math.cos(a) * 10 - 2), Math.min(1, dt * 2));
+                        camera.lookAt(0, 1.1, 0);
+                    } else {
+                        camera.position.lerp(new THREE.Vector3(-6.5, 3.2, -6.5), Math.min(1, dt * 3));
+                        camera.lookAt(0, 1.1, 1);
+                    }
+                    renderer.render(scene, camera);
+                }
+                tick();
+                addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+            })();
+        });
+    </script>
+</body>
+</html>
